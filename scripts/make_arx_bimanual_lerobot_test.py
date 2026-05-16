@@ -169,3 +169,45 @@ def test_convert_dataset_can_map_physical_gripper_values_to_openpi_range(tmp_pat
     assert np.isclose(state[13], (-0.45 - -2.8) / (0.0 - -2.8))
     assert converted_action[6] == 0.0
     assert converted_action[13] == 1.0
+
+
+def test_video_conversion_allows_fast_move_for_unique_episode_video(tmp_path, monkeypatch):
+    output_dir = tmp_path / "converted"
+    source_video = output_dir / "videos" / "observation.images.camera_h" / "chunk-000" / "file-000.mp4"
+    source_video.parent.mkdir(parents=True)
+    source_video.write_bytes(b"video")
+
+    calls = []
+
+    def fake_write_video_segment(source_path, dest_path, *, start_frame, frame_count, fps, allow_move):
+        calls.append((source_path, dest_path, start_frame, frame_count, fps, allow_move))
+
+    monkeypatch.setattr(make_arx_bimanual_lerobot, "_write_video_segment", fake_write_video_segment)
+
+    make_arx_bimanual_lerobot._write_legacy_video_files(
+        output_dir,
+        {
+            "fps": 30,
+            "video_path": "videos/{video_key}/chunk-{chunk_index:03d}/file-{file_index:03d}.mp4",
+        },
+        [
+            {
+                "episode_index": 0,
+                "length": 2,
+                "dataset_from_index": 0,
+                "videos/observation.images.camera_h/chunk_index": 0,
+                "videos/observation.images.camera_h/file_index": 0,
+            }
+        ],
+    )
+
+    assert calls == [
+        (
+            source_video,
+            output_dir / "videos" / "chunk-000" / "observation.images.camera_h" / "episode_000000.mp4",
+            0,
+            2,
+            30.0,
+            True,
+        )
+    ]

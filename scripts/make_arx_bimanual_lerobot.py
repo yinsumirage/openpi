@@ -327,6 +327,7 @@ def _write_legacy_video_files(output_dir: Path, info: dict[str, Any], episode_re
         return
 
     fps = float(info["fps"])
+    source_usage_counts = _video_source_usage_counts(output_dir, info, episode_records)
     for video_key in USED_VIDEO_KEYS:
         for record in episode_records:
             chunk_key = f"videos/{video_key}/chunk_index"
@@ -356,14 +357,51 @@ def _write_legacy_video_files(output_dir: Path, info: dict[str, Any], episode_re
                 start_frame=start_frame,
                 frame_count=int(record["length"]),
                 fps=fps,
+                allow_move=source_usage_counts.get(source_path, 0) == 1,
             )
 
 
-def _write_video_segment(source_path: Path, dest_path: Path, *, start_frame: int, frame_count: int, fps: float) -> None:
+def _video_source_usage_counts(
+    output_dir: Path,
+    info: dict[str, Any],
+    episode_records: list[dict[str, Any]],
+) -> dict[Path, int]:
+    video_path_template = info.get("video_path")
+    if not video_path_template:
+        return {}
+
+    counts: dict[Path, int] = {}
+    for video_key in USED_VIDEO_KEYS:
+        for record in episode_records:
+            chunk_key = f"videos/{video_key}/chunk_index"
+            file_key = f"videos/{video_key}/file_index"
+            if not all(key in record for key in (chunk_key, file_key)):
+                continue
+            source_path = output_dir / video_path_template.format(
+                video_key=video_key,
+                chunk_index=int(record[chunk_key]),
+                file_index=int(record[file_key]),
+            )
+            counts[source_path] = counts.get(source_path, 0) + 1
+    return counts
+
+
+def _write_video_segment(
+    source_path: Path,
+    dest_path: Path,
+    *,
+    start_frame: int,
+    frame_count: int,
+    fps: float,
+    allow_move: bool,
+) -> None:
     if dest_path.exists():
         return
     if not source_path.is_file():
         raise FileNotFoundError(f"Expected source video not found: {source_path}")
+
+    if allow_move and _move_whole_video_if_possible(source_path, dest_path, start_frame, frame_count):
+        return
 
     capture = cv2.VideoCapture(str(source_path))
     if not capture.isOpened():
@@ -387,6 +425,30 @@ def _write_video_segment(source_path: Path, dest_path: Path, *, start_frame: int
     finally:
         writer.release()
         capture.release()
+
+
+def _move_whole_video_if_possible(source_path: Path, dest_path: Path, start_frame: int, frame_count: int) -> bool:
+    if start_frame != 0:
+        return False
+
+    source_frame_count = _video_frame_count(source_path)
+    if source_frame_count is None or source_frame_count != frame_count:
+        return False
+
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    shutil.move(str(source_path), str(dest_path))
+    return True
+
+
+def _video_frame_count(video_path: Path) -> int | None:
+    capture = cv2.VideoCapture(str(video_path))
+    if not capture.isOpened():
+        return None
+    try:
+        frame_count = int(capture.get(cv2.CAP_PROP_FRAME_COUNT))
+    finally:
+        capture.release()
+    return frame_count if frame_count > 0 else None
 
 
 def _ceil_div(value: int, divisor: int) -> int:

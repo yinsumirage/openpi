@@ -89,6 +89,12 @@ the pinned LeRobot loader. `meta/info.json` should contain:
 "video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4"
 ```
 
+If the source videos are already one file per episode, conversion should mostly move
+video files into the loader-compatible path and finish quickly. If conversion is
+still slow, it is falling back to segment re-encoding because multiple episodes
+share a source video file or the source video frame count does not match episode
+length.
+
 ## 5. Dataset Shape Check
 
 ```bash
