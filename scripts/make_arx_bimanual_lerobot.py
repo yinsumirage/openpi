@@ -18,6 +18,7 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import numpy as np
 import polars as pl
 
 
@@ -86,7 +87,9 @@ def convert_dataset(
 
     info_path = output_dir / "meta" / "info.json"
     _rewrite_info(info_path)
-    _ensure_tasks_jsonl(output_dir / "meta" / "tasks.jsonl", info_path)
+    task = _ensure_tasks_jsonl(output_dir / "meta" / "tasks.jsonl", info_path)
+    _ensure_episodes_jsonl(output_dir / "meta" / "episodes.jsonl", parquet_paths, task)
+    _ensure_episodes_stats_jsonl(output_dir / "meta" / "episodes_stats.jsonl", parquet_paths)
 
 
 def _rewrite_parquet(parquet_path: Path, *, gripper_mapping: GripperMapping | None) -> None:
@@ -163,13 +166,87 @@ def _rewrite_info(info_path: Path) -> None:
     info_path.write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
-def _ensure_tasks_jsonl(tasks_path: Path, info_path: Path) -> None:
-    if tasks_path.exists():
-        return
-
+def _ensure_tasks_jsonl(tasks_path: Path, info_path: Path) -> str:
     info = json.loads(info_path.read_text(encoding="utf-8"))
     task = _infer_task(info)
+    if tasks_path.exists():
+        return task
+
     tasks_path.write_text(json.dumps({"task_index": 0, "task": task}, separators=(",", ":")) + "\n", encoding="utf-8")
+    return task
+
+
+def _ensure_episodes_jsonl(episodes_path: Path, parquet_paths: list[Path], task: str) -> None:
+    if episodes_path.exists():
+        return
+
+    rows = _episode_lengths(parquet_paths)
+    lines = [
+        json.dumps(
+            {"episode_index": episode_index, "tasks": [task], "length": length},
+            separators=(",", ":"),
+        )
+        for episode_index, length in rows
+    ]
+    episodes_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _ensure_episodes_stats_jsonl(episodes_stats_path: Path, parquet_paths: list[Path]) -> None:
+    if episodes_stats_path.exists():
+        return
+
+    episode_values: dict[int, dict[str, list[list[float]]]] = {}
+    for parquet_path in parquet_paths:
+        df = pl.read_parquet(parquet_path, columns=["episode_index", "observation.state", "action"])
+        for row in df.iter_rows(named=True):
+            episode_index = int(row.get("episode_index", 0))
+            values = episode_values.setdefault(episode_index, {"observation.state": [], "action": []})
+            values["observation.state"].append(_to_float_list(row["observation.state"]))
+            values["action"].append(_to_float_list(row["action"]))
+
+    lines = []
+    for episode_index in sorted(episode_values):
+        stats = {
+            key: _compute_stats(np.asarray(values, dtype=np.float32))
+            for key, values in episode_values[episode_index].items()
+        }
+        lines.append(
+            json.dumps(
+                {"episode_index": episode_index, "stats": stats},
+                separators=(",", ":"),
+            )
+        )
+    episodes_stats_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def _episode_lengths(parquet_paths: list[Path]) -> list[tuple[int, int]]:
+    lengths: dict[int, int] = {}
+    for parquet_path in parquet_paths:
+        df = pl.read_parquet(parquet_path, columns=["episode_index"])
+        if "episode_index" not in df.columns:
+            lengths[0] = lengths.get(0, 0) + len(df)
+            continue
+        counts = df.group_by("episode_index").len().sort("episode_index")
+        for episode_index, length in counts.iter_rows():
+            episode_index = int(episode_index)
+            lengths[episode_index] = lengths.get(episode_index, 0) + int(length)
+    return sorted(lengths.items())
+
+
+def _compute_stats(values: np.ndarray) -> dict[str, list[float]]:
+    return {
+        "min": values.min(axis=0).tolist(),
+        "max": values.max(axis=0).tolist(),
+        "mean": values.mean(axis=0).tolist(),
+        "std": values.std(axis=0).tolist(),
+        "count": [len(values)],
+    }
+
+
+def _to_float_list(values: Any) -> list[float]:
+    if hasattr(values, "to_list"):
+        values = values.to_list()
+    return [float(value) for value in values]
 
 
 def _infer_task(info: dict[str, Any]) -> str:

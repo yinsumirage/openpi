@@ -30,6 +30,8 @@ def test_convert_dataset_rewrites_state_action_features_and_preserves_assets(tmp
                 [float(i) for i in range(14)],
                 [float(i) for i in range(200, 214)],
             ],
+            "episode_index": [0, 0],
+            "task_index": [0, 0],
             "observation.images.camera_h": ["video/frame-0", "video/frame-1"],
         }
     ).write_parquet(data_dir / "file-000.parquet")
@@ -90,6 +92,14 @@ def test_convert_dataset_rewrites_state_action_features_and_preserves_assets(tmp
     assert (output_dir / "meta" / "tasks.jsonl").read_text(encoding="utf-8") == (
         '{"task_index":0,"task":"place the red block on the blue block"}\n'
     )
+    assert (output_dir / "meta" / "episodes.jsonl").read_text(encoding="utf-8") == (
+        '{"episode_index":0,"tasks":["place the red block on the blue block"],"length":2}\n'
+    )
+    episodes_stats = (output_dir / "meta" / "episodes_stats.jsonl").read_text(encoding="utf-8")
+    assert '"episode_index":0' in episodes_stats
+    assert '"observation.state"' in episodes_stats
+    assert '"action"' in episodes_stats
+    assert '"count":[2]' in episodes_stats
 
 
 def test_convert_dataset_can_map_physical_gripper_values_to_openpi_range(tmp_path):
