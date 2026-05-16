@@ -61,14 +61,26 @@ action = action.joint_actions[:14]
 
 ## Gripper Requirement
 
-Before training, re-export the dataset so gripper values follow the openpi ARX convention:
+Before training, convert gripper values so they follow the openpi ARX convention:
 
 ```text
 0.0 = fully open
 1.0 = fully closed
 ```
 
-The current converter intentionally does not convert physical command values such as `-2.3` or `-0.3`. If old gripper command-space data is used, ARX norm stats are not valid.
+The openpi converter can map physical command values linearly:
+
+```bash
+--gripper-normalization physical --gripper-open-value -2.8 --gripper-close-value 0.0
+```
+
+The mapping is:
+
+```text
+normalized = (value - open_value) / (close_value - open_value)
+```
+
+The result is clipped to `[0, 1]`. With `open_value=-2.8` and `close_value=0.0`, a holding value like `-0.45` maps to about `0.84`.
 
 ## Why Not ALOHA Transforms
 
@@ -81,3 +93,26 @@ The current converter intentionally does not convert physical command values suc
 3. Inspect loss, checkpoint assets, and simple policy loading.
 4. If the first run is stable, try 10k or 20k steps.
 5. If reused ARX norm stats are unstable, compute dataset-specific norm stats with `pi05_arx_debug_fresh_stats`.
+
+## Legacy HDF5 Export
+
+The ACT pipeline reference converter is stored at:
+
+```text
+scripts/convert_lerobot_to_hdf5.py
+```
+
+It reads a directory containing `trainable/` and writes legacy `episode_*.hdf5` files. It also supports the same optional gripper mapping:
+
+```bash
+uv run scripts/convert_lerobot_to_hdf5.py \
+  --source /path/to/source_dir_containing_trainable \
+  --output-dir /path/to/hdf5_output \
+  --camera-names right_wrist \
+  --overwrite \
+  --gripper-normalization physical \
+  --gripper-open-value -2.8 \
+  --gripper-close-value 0.0
+```
+
+This script is for the ACT/HDF5 path. The openpi/pi0.5 training path uses `scripts/make_arx_bimanual_lerobot.py`.

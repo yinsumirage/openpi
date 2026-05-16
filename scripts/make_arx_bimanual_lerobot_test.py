@@ -1,5 +1,6 @@
 import json
 
+import numpy as np
 import polars as pl
 
 from scripts import make_arx_bimanual_lerobot
@@ -86,3 +87,54 @@ def test_convert_dataset_rewrites_state_action_features_and_preserves_assets(tmp
         ],
     }
     assert info["features"]["action"]["shape"] == [14]
+
+
+def test_convert_dataset_can_map_physical_gripper_values_to_openpi_range(tmp_path):
+    raw_dir = tmp_path / "raw"
+    output_dir = tmp_path / "converted"
+    data_dir = raw_dir / "data" / "chunk-000"
+    meta_dir = raw_dir / "meta"
+    data_dir.mkdir(parents=True)
+    meta_dir.mkdir()
+
+    left_state = [0.0] * 27
+    right_state = [0.0] * 27
+    action = [0.0] * 14
+    left_state[6] = -2.8
+    right_state[6] = -0.45
+    action[6] = -3.4
+    action[13] = 0.1
+
+    pl.DataFrame(
+        {
+            "observation.master_left_state": [left_state],
+            "observation.master_right_state": [right_state],
+            "action.joint_actions": [action],
+        }
+    ).write_parquet(data_dir / "file-000.parquet")
+    (meta_dir / "info.json").write_text(
+        json.dumps(
+            {
+                "codebase_version": "v3.0",
+                "features": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    make_arx_bimanual_lerobot.convert_dataset(
+        raw_dir,
+        output_dir,
+        gripper_normalization="physical",
+        gripper_open_value=-2.8,
+        gripper_close_value=0.0,
+    )
+
+    converted = pl.read_parquet(output_dir / "data" / "chunk-000" / "file-000.parquet")
+    state = converted["observation.state"][0].to_list()
+    converted_action = converted["action"][0].to_list()
+
+    assert state[6] == 0.0
+    assert np.isclose(state[13], (-0.45 - -2.8) / (0.0 - -2.8))
+    assert converted_action[6] == 0.0
+    assert converted_action[13] == 1.0

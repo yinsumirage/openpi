@@ -30,10 +30,13 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
   - dim 6: left gripper
   - dims 7:13: right arm joints
   - dim 13: right gripper
-- Gripper values must be re-exported into openpi convention before training:
+- Gripper values must be converted into openpi convention before training:
   - `0.0 = fully open`
   - `1.0 = fully closed`
-- The current converter does not remap physical gripper commands such as `-2.3` or `-0.3`.
+- `scripts/make_arx_bimanual_lerobot.py` can do this with:
+  - `--gripper-normalization physical`
+  - `--gripper-open-value -2.8`
+  - `--gripper-close-value 0.0`
 
 ## Files Added For ARX
 
@@ -47,6 +50,10 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
   - Copies a LeRobot v3 dataset.
   - Adds `observation.state = master_left_state[:7] + master_right_state[:7]`.
   - Adds `action = action.joint_actions[:14]`.
+  - Optionally maps ARX physical gripper values into openpi `0=open, 1=closed`.
+- `scripts/convert_lerobot_to_hdf5.py`
+  - Stores the legacy LeRobot-to-HDF5 converter used by the ACT pipeline.
+  - Supports the same optional physical gripper mapping.
 - Tests:
   - `src/openpi/policies/arx_policy_test.py`
   - `src/openpi/training/arx_config_test.py`

@@ -63,7 +63,10 @@ export ARX_OUT="${HF_LEROBOT_HOME}/${ARX_REPO}"
 uv run scripts/make_arx_bimanual_lerobot.py \
   --raw-dir "${ARX_RAW}" \
   --output-dir "${ARX_OUT}" \
-  --overwrite
+  --overwrite \
+  --gripper-normalization physical \
+  --gripper-open-value -2.8 \
+  --gripper-close-value 0.0
 ```
 
 Expected:
@@ -97,6 +100,26 @@ Expected:
 state len: 14
 action len: 14
 ```
+
+Check a few gripper values:
+
+```bash
+uv run python - <<'PY'
+import os
+from pathlib import Path
+import polars as pl
+
+repo = Path(os.environ["HF_LEROBOT_HOME"]) / "local/arx_block_stack_bimanual"
+parquet = sorted((repo / "data").glob("chunk-*/*.parquet"))[0]
+df = pl.read_parquet(parquet, n_rows=10)
+states = df["observation.state"].to_list()
+actions = df["action"].to_list()
+print("state grippers:", [(row[6], row[13]) for row in states[:5]])
+print("action grippers:", [(row[6], row[13]) for row in actions[:5]])
+PY
+```
+
+Expected: gripper values are within `[0.0, 1.0]`.
 
 ## 6. Data Loader Smoke Test
 
@@ -164,6 +187,6 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
 
 ## Failure Notes
 
-- If gripper values are still in physical command space, stop and re-export data before training.
+- If gripper values are still in physical command space, rerun conversion with `--gripper-normalization physical`.
 - If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
 - If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.
