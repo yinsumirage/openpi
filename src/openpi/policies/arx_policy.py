@@ -82,8 +82,8 @@ def _parse_image(img: np.ndarray) -> np.ndarray:
 
     if img.ndim != 3:
         raise ValueError(f"Expected image to have 3 dimensions, got shape {img.shape}")
-    if img.shape[0] in (1, 3, 4):
-        return einops.rearrange(img, "c h w -> h w c")
     if img.shape[-1] in (1, 3, 4):
         return img
+    if img.shape[0] in (1, 3, 4):
+        return einops.rearrange(img, "c h w -> h w c")
     raise ValueError(f"Expected image to be channel-first or channel-last, got shape {img.shape}")
