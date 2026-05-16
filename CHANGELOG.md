@@ -9,6 +9,7 @@
 - Added a LeRobot v3 ARX bi-manual conversion script.
 - Added optional physical gripper command to openpi `0=open, 1=closed` mapping.
 - Added the legacy LeRobot-to-HDF5 converter with the same optional gripper mapping.
+- Made the ARX LeRobot converter create `meta/tasks.jsonl` for offline local dataset loading.
 - Added focused tests for ARX transforms, config registration, and dataset conversion.
 - Added project memory and remote validation docs for continued ARX/pi0.5 work.
 

@@ -87,6 +87,9 @@ def test_convert_dataset_rewrites_state_action_features_and_preserves_assets(tmp
         ],
     }
     assert info["features"]["action"]["shape"] == [14]
+    assert (output_dir / "meta" / "tasks.jsonl").read_text(encoding="utf-8") == (
+        '{"task_index":0,"task":"place the red block on the blue block"}\n'
+    )
 
 
 def test_convert_dataset_can_map_physical_gripper_values_to_openpi_range(tmp_path):

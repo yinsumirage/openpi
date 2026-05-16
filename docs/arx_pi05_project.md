@@ -34,6 +34,7 @@ action: float32[14]
 observation.images.camera_h
 observation.images.camera_l
 observation.images.camera_r
+meta/tasks.jsonl
 ```
 
 The current config uses:

@@ -74,6 +74,7 @@ Expected:
 ```text
 ${ARX_OUT}/data/chunk-000/*.parquet
 ${ARX_OUT}/meta/info.json
+${ARX_OUT}/meta/tasks.jsonl
 ${ARX_OUT}/videos/...
 ```
 
@@ -120,6 +121,18 @@ PY
 ```
 
 Expected: gripper values are within `[0.0, 1.0]`.
+
+Check task metadata:
+
+```bash
+cat "${ARX_OUT}/meta/tasks.jsonl"
+```
+
+Expected:
+
+```text
+{"task_index":0,"task":"place the red block on the blue block"}
+```
 
 ## 6. Data Loader Smoke Test
 
@@ -188,5 +201,6 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
 ## Failure Notes
 
 - If gripper values are still in physical command space, rerun conversion with `--gripper-normalization physical`.
+- If `meta/tasks.jsonl` is missing, rerun conversion after pulling the latest branch.
 - If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
 - If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.

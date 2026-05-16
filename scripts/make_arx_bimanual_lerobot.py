@@ -84,7 +84,9 @@ def convert_dataset(
     for parquet_path in parquet_paths:
         _rewrite_parquet(parquet_path, gripper_mapping=gripper_mapping)
 
-    _rewrite_info(output_dir / "meta" / "info.json")
+    info_path = output_dir / "meta" / "info.json"
+    _rewrite_info(info_path)
+    _ensure_tasks_jsonl(output_dir / "meta" / "tasks.jsonl", info_path)
 
 
 def _rewrite_parquet(parquet_path: Path, *, gripper_mapping: GripperMapping | None) -> None:
@@ -159,6 +161,28 @@ def _rewrite_info(info_path: Path) -> None:
     features["observation.state"] = _feature()
     features["action"] = _feature()
     info_path.write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+
+
+def _ensure_tasks_jsonl(tasks_path: Path, info_path: Path) -> None:
+    if tasks_path.exists():
+        return
+
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    task = _infer_task(info)
+    tasks_path.write_text(json.dumps({"task_index": 0, "task": task}, separators=(",", ":")) + "\n", encoding="utf-8")
+
+
+def _infer_task(info: dict[str, Any]) -> str:
+    tasks = info.get("tasks")
+    if isinstance(tasks, dict) and tasks:
+        first_key = sorted(tasks, key=lambda key: int(key))[0]
+        return str(tasks[first_key])
+    if isinstance(tasks, list) and tasks:
+        first_task = tasks[0]
+        if isinstance(first_task, dict):
+            return str(first_task.get("task", "place the red block on the blue block"))
+        return str(first_task)
+    return "place the red block on the blue block"
 
 
 def _feature() -> dict[str, Any]:
