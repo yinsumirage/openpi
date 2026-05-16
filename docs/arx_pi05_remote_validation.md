@@ -1,0 +1,169 @@
+# ARX pi0.5 Remote Validation
+
+Run these commands on the remote training machine, not in this local Windows checkout.
+
+## 1. Environment
+
+```bash
+conda activate openpi-jax
+cd ~/code/openpi
+git status --short --branch
+```
+
+Expected:
+
+```text
+## arx-pi05...origin/arx-pi05
+```
+
+## 2. Unit Tests
+
+```bash
+uv run pytest \
+  src/openpi/policies/arx_policy_test.py \
+  src/openpi/training/arx_config_test.py \
+  scripts/make_arx_bimanual_lerobot_test.py \
+  -q
+```
+
+Expected: all tests pass.
+
+## 3. Config Smoke Test
+
+```bash
+uv run python - <<'PY'
+from openpi.training import config
+
+cfg = config.get_config("pi05_arx_debug")
+print(cfg.name)
+print(cfg.model)
+print(cfg.data)
+print(cfg.weight_loader)
+PY
+```
+
+Expected:
+
+```text
+pi05_arx_debug
+```
+
+The printed data config should include `asset_id='arx'` and `repo_id='local/arx_block_stack_bimanual'`.
+
+## 4. Convert Dataset
+
+Set these paths to the real remote dataset locations:
+
+```bash
+export ARX_RAW=/path/to/original/trainable
+export ARX_REPO=local/arx_block_stack_bimanual
+export HF_LEROBOT_HOME="${HF_LEROBOT_HOME:-${HOME}/.cache/huggingface/lerobot}"
+export ARX_OUT="${HF_LEROBOT_HOME}/${ARX_REPO}"
+
+uv run scripts/make_arx_bimanual_lerobot.py \
+  --raw-dir "${ARX_RAW}" \
+  --output-dir "${ARX_OUT}" \
+  --overwrite
+```
+
+Expected:
+
+```text
+${ARX_OUT}/data/chunk-000/*.parquet
+${ARX_OUT}/meta/info.json
+${ARX_OUT}/videos/...
+```
+
+## 5. Dataset Shape Check
+
+```bash
+uv run python - <<'PY'
+import os
+from pathlib import Path
+import polars as pl
+
+repo = Path(os.environ["HF_LEROBOT_HOME"]) / "local/arx_block_stack_bimanual"
+parquet = sorted((repo / "data").glob("chunk-*/*.parquet"))[0]
+df = pl.read_parquet(parquet, n_rows=3)
+print(df.select(["observation.state", "action"]))
+print("state len:", len(df["observation.state"][0]))
+print("action len:", len(df["action"][0]))
+PY
+```
+
+Expected:
+
+```text
+state len: 14
+action len: 14
+```
+
+## 6. Data Loader Smoke Test
+
+This checks LeRobot loading, ARX transforms, ARX norm stats, tokenization, image resize, and action padding.
+
+```bash
+uv run python - <<'PY'
+import dataclasses
+from openpi.training import config
+from openpi.training import data_loader
+
+cfg = config.get_config("pi05_arx_debug")
+cfg = dataclasses.replace(cfg, batch_size=2, num_workers=0)
+loader = data_loader.create_data_loader(cfg, num_batches=1, shuffle=False)
+batch = next(iter(loader))
+obs, actions = batch
+print("state:", obs.state.shape)
+print("actions:", actions.shape)
+print("images:", {k: v.shape for k, v in obs.images.items()})
+print("masks:", {k: v.shape for k, v in obs.image_masks.items()})
+PY
+```
+
+Expected:
+
+```text
+state: (2, 32)
+actions: (2, 50, 32)
+```
+
+## 7. First Training Run
+
+```bash
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
+  pi05_arx_debug \
+  --exp-name arx_block_stack_debug \
+  --overwrite
+```
+
+Watch for:
+
+- No dataset key errors.
+- No norm stats loading errors.
+- Loss starts logging.
+- Checkpoints save under `checkpoints/pi05_arx_debug/arx_block_stack_debug`.
+
+## 8. Optional Dataset-specific Norm Stats Comparison
+
+Only run this after the reused ARX stats path works, or if training clearly fails because stats are mismatched.
+
+```bash
+uv run scripts/compute_norm_stats.py --config-name pi05_arx_debug_fresh_stats
+```
+
+This writes stats under `assets/pi05_arx_debug_fresh_stats/local/arx_block_stack_bimanual`.
+
+Then run:
+
+```bash
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
+  pi05_arx_debug_fresh_stats \
+  --exp-name arx_block_stack_fresh_stats_debug \
+  --overwrite
+```
+
+## Failure Notes
+
+- If gripper values are still in physical command space, stop and re-export data before training.
+- If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
+- If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.
