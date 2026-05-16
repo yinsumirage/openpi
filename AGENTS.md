@@ -10,6 +10,8 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
 - Target asset id: `arx`
 - Training config added locally: `pi05_arx_debug`
 - Fresh norm-stats comparison config: `pi05_arx_debug_fresh_stats`
+- Low-memory LoRA training config: `pi05_arx_lora_debug`
+- Low-memory LoRA fresh-stats config: `pi05_arx_lora_debug_fresh_stats`
 - Dataset repo id expected by the config: `local/arx_block_stack_bimanual`
 - Task prompt: `place the red block on the blue block`
 
@@ -45,13 +47,16 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
   - Does not apply ALOHA/Trossen joint flips or gripper transforms.
 - `src/openpi/training/config.py`
   - Adds `LeRobotArxDataConfig`.
-  - Adds `pi05_arx_debug`.
+  - Adds `pi05_arx_debug` and `pi05_arx_lora_debug`.
+  - Use `pi05_arx_lora_debug` as the default training path on 2x RTX 4090.
+  - Full fine-tuning can OOM before the first step.
 - `scripts/make_arx_bimanual_lerobot.py`
   - Copies a LeRobot v3 dataset.
   - Adds `observation.state = master_left_state[:7] + master_right_state[:7]`.
   - Adds `action = action.joint_actions[:14]`.
   - Optionally maps ARX physical gripper values into openpi `0=open, 1=closed`.
-  - Rewrites the output dataset into the v2.1-style per-episode parquet/video layout expected by the pinned LeRobot loader.
+  - Rewrites the output dataset into the v2.1-style per-episode parquet/video layout.
+  - This matches the path template expected by the pinned LeRobot loader.
   - Ensures `meta/tasks.jsonl`, `meta/episodes.jsonl`, and `meta/episodes_stats.jsonl` exist for offline loading.
 - `scripts/convert_lerobot_to_hdf5.py`
   - Stores the legacy LeRobot-to-HDF5 converter used by the ACT pipeline.

@@ -34,7 +34,7 @@ Expected: all tests pass.
 uv run python - <<'PY'
 from openpi.training import config
 
-cfg = config.get_config("pi05_arx_debug")
+cfg = config.get_config("pi05_arx_lora_debug")
 print(cfg.name)
 print(cfg.model)
 print(cfg.data)
@@ -45,10 +45,11 @@ PY
 Expected:
 
 ```text
-pi05_arx_debug
+pi05_arx_lora_debug
 ```
 
 The printed data config should include `asset_id='arx'` and `repo_id='local/arx_block_stack_bimanual'`.
+The printed model config should include `gemma_2b_lora` and `gemma_300m_lora`.
 
 ## 4. Convert Dataset
 
@@ -165,7 +166,7 @@ import dataclasses
 from openpi.training import config
 from openpi.training import data_loader
 
-cfg = config.get_config("pi05_arx_debug")
+cfg = config.get_config("pi05_arx_lora_debug")
 cfg = dataclasses.replace(cfg, batch_size=2, num_workers=0)
 loader = data_loader.create_data_loader(cfg, num_batches=1, shuffle=False)
 batch = next(iter(loader))
@@ -184,12 +185,33 @@ state: (2, 32)
 actions: (2, 50, 32)
 ```
 
-## 7. First Training Run
+## 7. First LoRA Training Run
+
+Run this short smoke test first. It checks checkpoint writing without committing to a long run.
 
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
-  pi05_arx_debug \
-  --exp-name arx_block_stack_debug \
+CUDA_VISIBLE_DEVICES=0,1 \
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 \
+LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}" \
+uv run scripts/train.py \
+  pi05_arx_lora_debug \
+  --exp-name arx_lora_smoke \
+  --batch-size 2 \
+  --num-train-steps 2 \
+  --save-interval 1 \
+  --log-interval 1 \
+  --overwrite
+```
+
+Then start the debug run:
+
+```bash
+CUDA_VISIBLE_DEVICES=0,1 \
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 \
+LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}" \
+uv run scripts/train.py \
+  pi05_arx_lora_debug \
+  --exp-name arx_block_stack_lora_debug \
   --overwrite
 ```
 
@@ -198,24 +220,27 @@ Watch for:
 - No dataset key errors.
 - No norm stats loading errors.
 - Loss starts logging.
-- Checkpoints save under `checkpoints/pi05_arx_debug/arx_block_stack_debug`.
+- Checkpoints save under `checkpoints/pi05_arx_lora_debug/arx_block_stack_lora_debug`.
 
 ## 8. Optional Dataset-specific Norm Stats Comparison
 
 Only run this after the reused ARX stats path works, or if training clearly fails because stats are mismatched.
 
 ```bash
-uv run scripts/compute_norm_stats.py --config-name pi05_arx_debug_fresh_stats
+uv run scripts/compute_norm_stats.py --config-name pi05_arx_lora_debug_fresh_stats
 ```
 
-This writes stats under `assets/pi05_arx_debug_fresh_stats/local/arx_block_stack_bimanual`.
+This writes stats under `assets/pi05_arx_lora_debug_fresh_stats/local/arx_block_stack_bimanual`.
 
 Then run:
 
 ```bash
-XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
-  pi05_arx_debug_fresh_stats \
-  --exp-name arx_block_stack_fresh_stats_debug \
+CUDA_VISIBLE_DEVICES=0,1 \
+XLA_PYTHON_CLIENT_MEM_FRACTION=0.85 \
+LD_LIBRARY_PATH="${CONDA_PREFIX}/lib:${LD_LIBRARY_PATH}" \
+uv run scripts/train.py \
+  pi05_arx_lora_debug_fresh_stats \
+  --exp-name arx_block_stack_lora_fresh_stats_debug \
   --overwrite
 ```
 
@@ -223,7 +248,10 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
 
 - If gripper values are still in physical command space, rerun conversion with `--gripper-normalization physical`.
 - If `meta/tasks.jsonl` is missing, rerun conversion after pulling the latest branch.
-- If the loader raises `KeyError: 'chunk_index'`, the converted output still has the old LeRobot v3 `data_path`; rerun conversion after pulling the latest branch and using `--overwrite`.
-- If the loader prints `diff`, `episode_index`, and `timestamps` entries and exits, the converted output still has jittered source timestamps; rerun conversion after pulling the latest branch and using `--overwrite`.
+- If the loader raises `KeyError: 'chunk_index'`, the output still has the old LeRobot v3 `data_path`.
+  Rerun conversion after pulling the latest branch and using `--overwrite`.
+- If the loader prints `diff`, `episode_index`, and `timestamps` entries and exits, timestamps are still jittered.
+  Rerun conversion after pulling the latest branch and using `--overwrite`.
 - If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
-- If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.
+- If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r`.
+- If full `pi05_arx_debug` OOMs during `init_train_state`, use `pi05_arx_lora_debug`.
