@@ -222,6 +222,9 @@ Watch for:
 - Loss starts logging.
 - Checkpoints save under `checkpoints/pi05_arx_lora_debug/arx_block_stack_lora_debug`.
 
+`pi05_arx_lora_debug` runs 20k steps and saves every 2k steps.
+The smoke test above still overrides those values from the CLI.
+
 ## 8. Optional Dataset-specific Norm Stats Comparison
 
 Only run this after the reused ARX stats path works, or if training clearly fails because stats are mismatched.
