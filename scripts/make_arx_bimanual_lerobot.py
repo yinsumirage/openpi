@@ -18,9 +18,15 @@ import shutil
 from pathlib import Path
 from typing import Any
 
+import cv2
 import numpy as np
 import polars as pl
 
+
+LEGACY_CHUNKS_SIZE = 1000
+LEGACY_DATA_PATH = "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"
+LEGACY_VIDEO_PATH = "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4"
+USED_VIDEO_KEYS = ("observation.images.camera_h", "observation.images.camera_r")
 
 ARX_BIMANUAL_NAMES = [
     "left_joint_0",
@@ -86,10 +92,14 @@ def convert_dataset(
         _rewrite_parquet(parquet_path, gripper_mapping=gripper_mapping)
 
     info_path = output_dir / "meta" / "info.json"
-    _rewrite_info(info_path)
+    info = json.loads(info_path.read_text(encoding="utf-8"))
+    episode_records = _load_episode_records(output_dir / "meta" / "episodes", parquet_paths)
+    _write_legacy_data_files(output_dir, episode_records)
+    _write_legacy_video_files(output_dir, info, episode_records)
+    _rewrite_info(info_path, episode_records)
     task = _ensure_tasks_jsonl(output_dir / "meta" / "tasks.jsonl", info_path)
-    _ensure_episodes_jsonl(output_dir / "meta" / "episodes.jsonl", parquet_paths, task)
-    _ensure_episodes_stats_jsonl(output_dir / "meta" / "episodes_stats.jsonl", parquet_paths)
+    _ensure_episodes_jsonl(output_dir / "meta" / "episodes.jsonl", episode_records, task)
+    _ensure_episodes_stats_jsonl(output_dir / "meta" / "episodes_stats.jsonl", output_dir, episode_records)
 
 
 def _rewrite_parquet(parquet_path: Path, *, gripper_mapping: GripperMapping | None) -> None:
@@ -158,57 +168,69 @@ def _slice(values: Any, start: int, stop: int) -> list[float]:
     return [float(value) for value in list(values)[start:stop]]
 
 
-def _rewrite_info(info_path: Path) -> None:
+def _rewrite_info(info_path: Path, episode_records: list[dict[str, Any]]) -> None:
     info = json.loads(info_path.read_text(encoding="utf-8"))
+    total_episodes = len(episode_records)
+    total_frames = sum(int(record["length"]) for record in episode_records)
+
+    info["codebase_version"] = "v2.1"
+    info["data_path"] = LEGACY_DATA_PATH
+    info["video_path"] = LEGACY_VIDEO_PATH
+    info["chunks_size"] = LEGACY_CHUNKS_SIZE
+    info["total_episodes"] = total_episodes
+    info["total_frames"] = total_frames
+    info["total_chunks"] = _ceil_div(total_episodes, LEGACY_CHUNKS_SIZE)
+
     features = info.setdefault("features", {})
     features["observation.state"] = _feature()
     features["action"] = _feature()
+    for key in list(features):
+        if key.startswith("observation.images.") and key not in USED_VIDEO_KEYS:
+            del features[key]
+    video_keys = [key for key in USED_VIDEO_KEYS if key in features]
+    info["total_videos"] = total_episodes * len(video_keys)
     info_path.write_text(json.dumps(info, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
 
 
 def _ensure_tasks_jsonl(tasks_path: Path, info_path: Path) -> str:
     info = json.loads(info_path.read_text(encoding="utf-8"))
     task = _infer_task(info)
-    if tasks_path.exists():
-        return task
 
     tasks_path.write_text(json.dumps({"task_index": 0, "task": task}, separators=(",", ":")) + "\n", encoding="utf-8")
     return task
 
 
-def _ensure_episodes_jsonl(episodes_path: Path, parquet_paths: list[Path], task: str) -> None:
-    if episodes_path.exists():
-        return
-
-    rows = _episode_lengths(parquet_paths)
+def _ensure_episodes_jsonl(episodes_path: Path, episode_records: list[dict[str, Any]], task: str) -> None:
     lines = [
         json.dumps(
-            {"episode_index": episode_index, "tasks": [task], "length": length},
+            {
+                "episode_index": int(record["episode_index"]),
+                "tasks": [task],
+                "length": int(record["length"]),
+            },
             separators=(",", ":"),
         )
-        for episode_index, length in rows
+        for record in sorted(episode_records, key=lambda item: int(item["episode_index"]))
     ]
     episodes_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
-def _ensure_episodes_stats_jsonl(episodes_stats_path: Path, parquet_paths: list[Path]) -> None:
-    if episodes_stats_path.exists():
-        return
-
-    episode_values: dict[int, dict[str, list[list[float]]]] = {}
-    for parquet_path in parquet_paths:
-        df = pl.read_parquet(parquet_path, columns=["episode_index", "observation.state", "action"])
-        for row in df.iter_rows(named=True):
-            episode_index = int(row.get("episode_index", 0))
-            values = episode_values.setdefault(episode_index, {"observation.state": [], "action": []})
-            values["observation.state"].append(_to_float_list(row["observation.state"]))
-            values["action"].append(_to_float_list(row["action"]))
-
+def _ensure_episodes_stats_jsonl(
+    episodes_stats_path: Path,
+    output_dir: Path,
+    episode_records: list[dict[str, Any]],
+) -> None:
     lines = []
-    for episode_index in sorted(episode_values):
+    for record in sorted(episode_records, key=lambda item: int(item["episode_index"])):
+        episode_index = int(record["episode_index"])
+        parquet_path = output_dir / LEGACY_DATA_PATH.format(
+            episode_chunk=episode_index // LEGACY_CHUNKS_SIZE,
+            episode_index=episode_index,
+        )
+        df = pl.read_parquet(parquet_path, columns=["observation.state", "action"])
         stats = {
-            key: _compute_stats(np.asarray(values, dtype=np.float32))
-            for key, values in episode_values[episode_index].items()
+            "observation.state": _compute_stats(np.asarray(df["observation.state"].to_list(), dtype=np.float32)),
+            "action": _compute_stats(np.asarray(df["action"].to_list(), dtype=np.float32)),
         }
         lines.append(
             json.dumps(
@@ -217,20 +239,6 @@ def _ensure_episodes_stats_jsonl(episodes_stats_path: Path, parquet_paths: list[
             )
         )
     episodes_stats_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-
-
-def _episode_lengths(parquet_paths: list[Path]) -> list[tuple[int, int]]:
-    lengths: dict[int, int] = {}
-    for parquet_path in parquet_paths:
-        df = pl.read_parquet(parquet_path, columns=["episode_index"])
-        if "episode_index" not in df.columns:
-            lengths[0] = lengths.get(0, 0) + len(df)
-            continue
-        counts = df.group_by("episode_index").len().sort("episode_index")
-        for episode_index, length in counts.iter_rows():
-            episode_index = int(episode_index)
-            lengths[episode_index] = lengths.get(episode_index, 0) + int(length)
-    return sorted(lengths.items())
 
 
 def _compute_stats(values: np.ndarray) -> dict[str, list[float]]:
@@ -243,10 +251,146 @@ def _compute_stats(values: np.ndarray) -> dict[str, list[float]]:
     }
 
 
-def _to_float_list(values: Any) -> list[float]:
-    if hasattr(values, "to_list"):
-        values = values.to_list()
-    return [float(value) for value in values]
+def _load_episode_records(episodes_dir: Path, parquet_paths: list[Path]) -> list[dict[str, Any]]:
+    if episodes_dir.is_dir():
+        records = []
+        for path in sorted(episodes_dir.glob("chunk-*/*.parquet")):
+            records.extend(pl.read_parquet(path).to_dicts())
+        if records:
+            return [_normalize_episode_record(record) for record in records]
+
+    records = []
+    for parquet_path in parquet_paths:
+        columns = pl.read_parquet(parquet_path, n_rows=1).columns
+        if "episode_index" in columns:
+            df = pl.read_parquet(parquet_path, columns=["episode_index"])
+            counts = df.group_by("episode_index").len().sort("episode_index")
+        else:
+            df = pl.read_parquet(parquet_path)
+            counts = pl.DataFrame({"episode_index": [0], "len": [len(df)]})
+
+        start = 0
+        for episode_index, length in counts.iter_rows():
+            records.append(
+                {
+                    "episode_index": int(episode_index),
+                    "length": int(length),
+                    "data/chunk_index": int(parquet_path.parent.name.split("-")[-1]),
+                    "data/file_index": int(parquet_path.stem.split("-")[-1]),
+                    "dataset_from_index": start,
+                    "dataset_to_index": start + int(length),
+                }
+            )
+            start += int(length)
+    return records
+
+
+def _normalize_episode_record(record: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(record)
+    if "length" not in normalized:
+        normalized["length"] = int(normalized["dataset_to_index"]) - int(normalized["dataset_from_index"])
+    return normalized
+
+
+def _write_legacy_data_files(output_dir: Path, episode_records: list[dict[str, Any]]) -> None:
+    grouped: dict[tuple[int, int], list[dict[str, Any]]] = {}
+    for record in episode_records:
+        key = (int(record["data/chunk_index"]), int(record["data/file_index"]))
+        grouped.setdefault(key, []).append(record)
+
+    for (chunk_index, file_index), records in grouped.items():
+        source_path = output_dir / f"data/chunk-{chunk_index:03d}/file-{file_index:03d}.parquet"
+        df = pl.read_parquet(source_path)
+        for record in records:
+            episode_index = int(record["episode_index"])
+            if "episode_index" in df.columns:
+                episode_df = df.filter(pl.col("episode_index") == episode_index)
+            else:
+                episode_df = pl.DataFrame()
+            if len(episode_df) == 0:
+                start = int(record["dataset_from_index"])
+                stop = int(record["dataset_to_index"])
+                episode_df = df.slice(start, stop - start)
+            dest_path = output_dir / LEGACY_DATA_PATH.format(
+                episode_chunk=episode_index // LEGACY_CHUNKS_SIZE,
+                episode_index=episode_index,
+            )
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            episode_df.write_parquet(dest_path)
+
+        source_path.unlink()
+
+
+def _write_legacy_video_files(output_dir: Path, info: dict[str, Any], episode_records: list[dict[str, Any]]) -> None:
+    video_path_template = info.get("video_path")
+    if not video_path_template:
+        return
+
+    fps = float(info["fps"])
+    for video_key in USED_VIDEO_KEYS:
+        for record in episode_records:
+            chunk_key = f"videos/{video_key}/chunk_index"
+            file_key = f"videos/{video_key}/file_index"
+            from_key = f"videos/{video_key}/from_timestamp"
+            if not all(key in record for key in (chunk_key, file_key)):
+                continue
+            if from_key in record:
+                start_frame = round(float(record[from_key]) * fps)
+            else:
+                start_frame = int(record["dataset_from_index"])
+
+            source_path = output_dir / video_path_template.format(
+                video_key=video_key,
+                chunk_index=int(record[chunk_key]),
+                file_index=int(record[file_key]),
+            )
+            episode_index = int(record["episode_index"])
+            dest_path = output_dir / LEGACY_VIDEO_PATH.format(
+                episode_chunk=episode_index // LEGACY_CHUNKS_SIZE,
+                video_key=video_key,
+                episode_index=episode_index,
+            )
+            _write_video_segment(
+                source_path,
+                dest_path,
+                start_frame=start_frame,
+                frame_count=int(record["length"]),
+                fps=fps,
+            )
+
+
+def _write_video_segment(source_path: Path, dest_path: Path, *, start_frame: int, frame_count: int, fps: float) -> None:
+    if dest_path.exists():
+        return
+    if not source_path.is_file():
+        raise FileNotFoundError(f"Expected source video not found: {source_path}")
+
+    capture = cv2.VideoCapture(str(source_path))
+    if not capture.isOpened():
+        raise ValueError(f"Failed to open video: {source_path}")
+
+    width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    writer = cv2.VideoWriter(str(dest_path), cv2.VideoWriter_fourcc(*"mp4v"), fps, (width, height))
+    if not writer.isOpened():
+        capture.release()
+        raise ValueError(f"Failed to open video writer: {dest_path}")
+
+    try:
+        capture.set(cv2.CAP_PROP_POS_FRAMES, start_frame)
+        for _ in range(frame_count):
+            ok, frame = capture.read()
+            if not ok:
+                raise ValueError(f"Failed to read frame from {source_path}")
+            writer.write(frame)
+    finally:
+        writer.release()
+        capture.release()
+
+
+def _ceil_div(value: int, divisor: int) -> int:
+    return (value + divisor - 1) // divisor
 
 
 def _infer_task(info: dict[str, Any]) -> str:

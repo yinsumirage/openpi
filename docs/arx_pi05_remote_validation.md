@@ -72,10 +72,21 @@ uv run scripts/make_arx_bimanual_lerobot.py \
 Expected:
 
 ```text
-${ARX_OUT}/data/chunk-000/*.parquet
+${ARX_OUT}/data/chunk-000/episode_000000.parquet
 ${ARX_OUT}/meta/info.json
 ${ARX_OUT}/meta/tasks.jsonl
+${ARX_OUT}/meta/episodes.jsonl
+${ARX_OUT}/meta/episodes_stats.jsonl
 ${ARX_OUT}/videos/...
+```
+
+The converter rewrites the output copy into the per-episode path template expected by
+the pinned LeRobot loader. `meta/info.json` should contain:
+
+```text
+"codebase_version": "v2.1"
+"data_path": "data/chunk-{episode_chunk:03d}/episode_{episode_index:06d}.parquet"
+"video_path": "videos/chunk-{episode_chunk:03d}/{video_key}/episode_{episode_index:06d}.mp4"
 ```
 
 ## 5. Dataset Shape Check
@@ -202,5 +213,6 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
 
 - If gripper values are still in physical command space, rerun conversion with `--gripper-normalization physical`.
 - If `meta/tasks.jsonl` is missing, rerun conversion after pulling the latest branch.
+- If the loader raises `KeyError: 'chunk_index'`, the converted output still has the old LeRobot v3 `data_path`; rerun conversion after pulling the latest branch and using `--overwrite`.
 - If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
 - If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.

@@ -51,7 +51,8 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
   - Adds `observation.state = master_left_state[:7] + master_right_state[:7]`.
   - Adds `action = action.joint_actions[:14]`.
   - Optionally maps ARX physical gripper values into openpi `0=open, 1=closed`.
-  - Ensures `meta/tasks.jsonl` exists for offline LeRobot loading.
+  - Rewrites the output dataset into the v2.1-style per-episode parquet/video layout expected by the pinned LeRobot loader.
+  - Ensures `meta/tasks.jsonl`, `meta/episodes.jsonl`, and `meta/episodes_stats.jsonl` exist for offline loading.
 - `scripts/convert_lerobot_to_hdf5.py`
   - Stores the legacy LeRobot-to-HDF5 converter used by the ACT pipeline.
   - Supports the same optional physical gripper mapping.
