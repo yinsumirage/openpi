@@ -94,7 +94,7 @@ def convert_dataset(
     info_path = output_dir / "meta" / "info.json"
     info = json.loads(info_path.read_text(encoding="utf-8"))
     episode_records = _load_episode_records(output_dir / "meta" / "episodes", parquet_paths)
-    _write_legacy_data_files(output_dir, episode_records)
+    _write_legacy_data_files(output_dir, episode_records, fps=float(info["fps"]))
     _write_legacy_video_files(output_dir, info, episode_records)
     _rewrite_info(info_path, episode_records)
     task = _ensure_tasks_jsonl(output_dir / "meta" / "tasks.jsonl", info_path)
@@ -292,7 +292,7 @@ def _normalize_episode_record(record: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
-def _write_legacy_data_files(output_dir: Path, episode_records: list[dict[str, Any]]) -> None:
+def _write_legacy_data_files(output_dir: Path, episode_records: list[dict[str, Any]], *, fps: float) -> None:
     grouped: dict[tuple[int, int], list[dict[str, Any]]] = {}
     for record in episode_records:
         key = (int(record["data/chunk_index"]), int(record["data/file_index"]))
@@ -311,6 +311,7 @@ def _write_legacy_data_files(output_dir: Path, episode_records: list[dict[str, A
                 start = int(record["dataset_from_index"])
                 stop = int(record["dataset_to_index"])
                 episode_df = df.slice(start, stop - start)
+            episode_df = _normalize_episode_timing(episode_df, fps=fps)
             dest_path = output_dir / LEGACY_DATA_PATH.format(
                 episode_chunk=episode_index // LEGACY_CHUNKS_SIZE,
                 episode_index=episode_index,
@@ -319,6 +320,14 @@ def _write_legacy_data_files(output_dir: Path, episode_records: list[dict[str, A
             episode_df.write_parquet(dest_path)
 
         source_path.unlink()
+
+
+def _normalize_episode_timing(episode_df: pl.DataFrame, *, fps: float) -> pl.DataFrame:
+    frame_indices = pl.int_range(0, pl.len(), dtype=pl.Int64)
+    return episode_df.with_columns(
+        frame_indices.alias("frame_index"),
+        (frame_indices.cast(pl.Float32) / fps).alias("timestamp"),
+    )
 
 
 def _write_legacy_video_files(output_dir: Path, info: dict[str, Any], episode_records: list[dict[str, Any]]) -> None:

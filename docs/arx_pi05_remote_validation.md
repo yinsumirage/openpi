@@ -95,6 +95,10 @@ still slow, it is falling back to segment re-encoding because multiple episodes
 share a source video file or the source video frame count does not match episode
 length.
 
+The converter also normalizes per-episode `timestamp` to `frame_index / fps`.
+This avoids LeRobot rejecting small capture-time jitter such as 0.031s or 0.035s
+between nominal 30 FPS frames.
+
 ## 5. Dataset Shape Check
 
 ```bash
@@ -220,5 +224,6 @@ XLA_PYTHON_CLIENT_MEM_FRACTION=0.9 uv run scripts/train.py \
 - If gripper values are still in physical command space, rerun conversion with `--gripper-normalization physical`.
 - If `meta/tasks.jsonl` is missing, rerun conversion after pulling the latest branch.
 - If the loader raises `KeyError: 'chunk_index'`, the converted output still has the old LeRobot v3 `data_path`; rerun conversion after pulling the latest branch and using `--overwrite`.
+- If the loader prints `diff`, `episode_index`, and `timestamps` entries and exits, the converted output still has jittered source timestamps; rerun conversion after pulling the latest branch and using `--overwrite`.
 - If LeRobot cannot find `local/arx_block_stack_bimanual`, check `HF_LEROBOT_HOME` and the output path.
 - If `cam_high` is unavailable or poor, adjust `LeRobotArxDataConfig.repack_transforms` to use only `camera_r` for `cam_high` and `cam_right_wrist`.

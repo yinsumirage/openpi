@@ -74,6 +74,8 @@ def test_convert_dataset_rewrites_state_action_features_and_preserves_assets(tmp
         [*map(float, range(14))],
         [*map(float, range(200, 214))],
     ]
+    assert converted["frame_index"].to_list() == [0, 1]
+    assert converted["timestamp"].to_list() == [0.0, np.float32(1 / 30).item()]
     assert converted["observation.images.camera_h"].to_list() == ["video/frame-0", "video/frame-1"]
     assert not (output_dir / "data" / "chunk-000" / "file-000.parquet").exists()
     assert (output_dir / "videos" / "placeholder.txt").read_text(encoding="utf-8") == "kept"
