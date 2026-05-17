@@ -19,6 +19,7 @@
 - Added focused tests for ARX transforms, config registration, and dataset conversion.
 - Added project memory and remote validation docs for continued ARX/pi0.5 work.
 - Added ARX pi0.5 remote deployment notes for the policy server and controller client.
+- Added `pi05_arx_lora_bad_debug` for comparing a lower-quality block-stacking dataset.
 
 ### Notes
 
