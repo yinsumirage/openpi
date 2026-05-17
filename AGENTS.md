@@ -15,6 +15,7 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
 - Low-memory LoRA fresh-stats config: `pi05_arx_lora_debug_fresh_stats`
 - Dataset repo id expected by the config: `local/arx_block_stack_bimanual`
 - Bad-data comparison dataset repo id: `local/arx_block_stack_bimanual_bad`
+- ARX debug configs save checkpoints every 5k steps to reduce disk usage.
 - Task prompt: `place the red block on the blue block`
 
 ## Environment Rules

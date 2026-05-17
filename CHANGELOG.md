@@ -6,7 +6,7 @@
 
 - Added ARX-5 bi-manual policy transforms for pi0.5 fine-tuning.
 - Added `LeRobotArxDataConfig`, full fine-tune ARX debug configs, and low-memory pi0.5 LoRA ARX debug configs.
-- Set the ARX pi0.5 LoRA debug configs to 20k steps with checkpoint saves every 2k steps.
+- Set the ARX pi0.5 LoRA debug configs to 20k steps with checkpoint saves every 5k steps.
 - Added a LeRobot v3 ARX bi-manual conversion script.
 - Added optional physical gripper command to openpi `0=open, 1=closed` mapping.
 - Added the legacy LeRobot-to-HDF5 converter with the same optional gripper mapping.
@@ -21,6 +21,7 @@
 - Added project memory and remote validation docs for continued ARX/pi0.5 work.
 - Added ARX pi0.5 remote deployment notes for the policy server and controller client.
 - Added `pi05_arx_lora_bad_debug` for comparing a lower-quality block-stacking dataset.
+- Changed ARX debug configs to save checkpoints every 5k steps to reduce disk usage.
 
 ### Notes
 

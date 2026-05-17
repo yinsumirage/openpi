@@ -33,7 +33,8 @@ def test_pi05_arx_debug_config_is_registered_for_local_bimanual_dataset():
     assert train_config.data.default_prompt == "place the red block on the blue block"
     assert train_config.batch_size == 8
     assert train_config.num_train_steps == 5_000
-    assert train_config.save_interval == 500
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
     assert train_config.wandb_enabled is False
 
     # The debug config should be cheap to customize from the CLI/dataclass overrides.
@@ -51,6 +52,8 @@ def test_pi05_arx_debug_fresh_stats_config_is_registered_for_dataset_norm_stats(
     assert train_config.data.default_prompt == "place the red block on the blue block"
     assert train_config.batch_size == 8
     assert train_config.num_train_steps == 5_000
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
 
 
 def test_pi05_arx_lora_debug_config_uses_low_memory_lora_finetuning():
@@ -66,8 +69,8 @@ def test_pi05_arx_lora_debug_config_uses_low_memory_lora_finetuning():
     assert train_config.data.assets.asset_id == "arx"
     assert train_config.batch_size == 8
     assert train_config.num_train_steps == 20_000
-    assert train_config.save_interval == 2_000
-    assert train_config.keep_period == 2_000
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
     assert train_config.wandb_enabled is False
 
 
@@ -85,8 +88,8 @@ def test_pi05_arx_lora_bad_debug_config_targets_bad_quality_dataset():
     assert train_config.data.default_prompt == "place the red block on the blue block"
     assert train_config.batch_size == 8
     assert train_config.num_train_steps == 20_000
-    assert train_config.save_interval == 2_000
-    assert train_config.keep_period == 2_000
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
     assert train_config.wandb_enabled is False
 
 
@@ -103,5 +106,5 @@ def test_pi05_arx_lora_debug_fresh_stats_config_is_registered_for_dataset_norm_s
     assert train_config.data.assets.asset_id is None
     assert train_config.batch_size == 8
     assert train_config.num_train_steps == 20_000
-    assert train_config.save_interval == 2_000
-    assert train_config.keep_period == 2_000
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
