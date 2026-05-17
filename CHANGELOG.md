@@ -10,6 +10,7 @@
 - Added a LeRobot v3 ARX bi-manual conversion script.
 - Added optional physical gripper command to openpi `0=open, 1=closed` mapping.
 - Added the legacy LeRobot-to-HDF5 converter with the same optional gripper mapping.
+- Added an ACT HDF5-to-LeRobot converter for recovering OpenPI training datasets from `episode_*.hdf5`.
 - Made the ARX LeRobot converter create `meta/tasks.jsonl` for offline local dataset loading.
 - Made the ARX LeRobot converter emit v2.1-style per-episode parquet/video paths.
 - This avoids pinned LeRobot loader failures on v3 `chunk_index/file_index` templates.

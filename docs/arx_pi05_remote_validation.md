@@ -23,6 +23,7 @@ uv run pytest \
   src/openpi/policies/arx_policy_test.py \
   src/openpi/training/arx_config_test.py \
   scripts/make_arx_bimanual_lerobot_test.py \
+  scripts/make_arx_lerobot_from_hdf5_test.py \
   -q
 ```
 
@@ -99,6 +100,30 @@ length.
 The converter also normalizes per-episode `timestamp` to `frame_index / fps`.
 This avoids LeRobot rejecting small capture-time jitter such as 0.031s or 0.035s
 between nominal 30 FPS frames.
+
+### Convert ACT HDF5 Episodes Instead
+
+If the source dataset only exists as ACT-style `episode_*.hdf5` files, convert it
+directly into the same OpenPI-readable local LeRobot layout:
+
+```bash
+export ARX_HDF5=/path/to/hdf5_episodes
+export ARX_REPO=local/arx_block_stack_bimanual_bad
+export HF_LEROBOT_HOME="${HF_LEROBOT_HOME:-${HOME}/.cache/huggingface/lerobot}"
+export ARX_OUT="${HF_LEROBOT_HOME}/${ARX_REPO}"
+
+uv run scripts/make_arx_lerobot_from_hdf5.py \
+  --hdf5-dir "${ARX_HDF5}" \
+  --output-dir "${ARX_OUT}" \
+  --overwrite \
+  --gripper-normalization physical \
+  --gripper-open-value -2.8 \
+  --gripper-close-value 0.0
+```
+
+This reads `/observations/qpos`, `/action`, and JPEG-padded `head` /
+`right_wrist` frames. It writes `observation.state`, `action`,
+`observation.images.camera_h`, and `observation.images.camera_r`.
 
 ## 5. Dataset Shape Check
 
