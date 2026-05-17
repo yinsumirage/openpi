@@ -61,6 +61,9 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
 - `scripts/convert_lerobot_to_hdf5.py`
   - Stores the legacy LeRobot-to-HDF5 converter used by the ACT pipeline.
   - Supports the same optional physical gripper mapping.
+- `docs/arx_pi05_deployment.md`
+  - Describes the first remote policy-server deployment path for ARX-5.
+  - Covers 4090 server startup, controller-PC client inputs, action mapping, and safety checks.
 - Tests:
   - `src/openpi/policies/arx_policy_test.py`
   - `src/openpi/training/arx_config_test.py`

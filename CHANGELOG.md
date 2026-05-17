@@ -18,6 +18,7 @@
 - This avoids LeRobot timestamp sync failures on small capture jitter.
 - Added focused tests for ARX transforms, config registration, and dataset conversion.
 - Added project memory and remote validation docs for continued ARX/pi0.5 work.
+- Added ARX pi0.5 remote deployment notes for the policy server and controller client.
 
 ### Notes
 
