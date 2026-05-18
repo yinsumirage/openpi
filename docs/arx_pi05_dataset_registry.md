@@ -16,7 +16,7 @@ All datasets below use the 14D bi-manual ARX state/action layout:
 | Dataset | Repo ID | Config | Prompt | Source / Notes |
 | --- | --- | --- | --- | --- |
 | Block stack baseline | `local/arx_block_stack_bimanual` | `pi05_arx_lora_debug` | `place the red block on the blue block` | Main successful block-stack dataset. Convert from LeRobot trainable with `scripts/make_arx_bimanual_lerobot.py`. |
-| Block stack lower-quality comparison | `local/arx_block_stack_bimanual_bad` | `pi05_arx_lora_bad_debug` | `place the red block on the blue block` | Lower-quality comparison dataset. Convert from LeRobot trainable with `scripts/make_arx_bimanual_lerobot.py`, or recover from ACT HDF5 with `scripts/make_arx_lerobot_from_hdf5.py`. |
+| Block stack new collection validation | `local/arx_block_stack_bimanual_new` | `pi05_arx_lora_new_debug` | `place the red block on the blue block` | Newly collected block-stack dataset for validating the updated data collection path. Convert from LeRobot trainable with `scripts/make_arx_bimanual_lerobot.py`. |
 | Watermelon to basket | `local/arx_watermelon_basket_bimanual` | `pi05_arx_lora_watermelon_basket_debug` | `scoop up the watermelon on the right and place it in the basket on the left` | New task: scoop the watermelon on the right and put it into the basket on the left. Convert from LeRobot trainable with `scripts/make_arx_bimanual_lerobot.py`. |
 
 ## Convert LeRobot Trainable Data
@@ -44,7 +44,7 @@ Use this only when the source data exists as `episode_*.hdf5` files:
 
 ```bash
 export ARX_HDF5=/path/to/hdf5_episodes
-export ARX_REPO=local/arx_block_stack_bimanual_bad
+export ARX_REPO=local/arx_block_stack_bimanual_new
 export HF_LEROBOT_HOME="${HF_LEROBOT_HOME:-${HOME}/.cache/huggingface/lerobot}"
 export ARX_OUT="${HF_LEROBOT_HOME}/${ARX_REPO}"
 

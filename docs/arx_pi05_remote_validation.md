@@ -110,7 +110,7 @@ directly into the same OpenPI-readable local LeRobot layout:
 
 ```bash
 export ARX_HDF5=/path/to/hdf5_episodes
-export ARX_REPO=local/arx_block_stack_bimanual_bad
+export ARX_REPO=local/arx_block_stack_bimanual_new
 export HF_LEROBOT_HOME="${HF_LEROBOT_HOME:-${HOME}/.cache/huggingface/lerobot}"
 export ARX_OUT="${HF_LEROBOT_HOME}/${ARX_REPO}"
 

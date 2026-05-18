@@ -937,14 +937,14 @@ _CONFIGS = [
         wandb_enabled=False,
     ),
     TrainConfig(
-        name="pi05_arx_lora_bad_debug",
+        name="pi05_arx_lora_new_debug",
         model=pi0_config.Pi0Config(
             pi05=True,
             paligemma_variant="gemma_2b_lora",
             action_expert_variant="gemma_300m_lora",
         ),
         data=LeRobotArxDataConfig(
-            repo_id="local/arx_block_stack_bimanual_bad",
+            repo_id="local/arx_block_stack_bimanual_new",
             assets=AssetsConfig(
                 assets_dir="gs://openpi-assets/checkpoints/pi05_base/assets",
                 asset_id="arx",

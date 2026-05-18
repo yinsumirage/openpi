@@ -74,15 +74,15 @@ def test_pi05_arx_lora_debug_config_uses_low_memory_lora_finetuning():
     assert train_config.wandb_enabled is False
 
 
-def test_pi05_arx_lora_bad_debug_config_targets_bad_quality_dataset():
-    train_config = _config.get_config("pi05_arx_lora_bad_debug")
+def test_pi05_arx_lora_new_debug_config_targets_newly_collected_dataset():
+    train_config = _config.get_config("pi05_arx_lora_new_debug")
 
     assert train_config.model.pi05 is True
     assert train_config.model.paligemma_variant == "gemma_2b_lora"
     assert train_config.model.action_expert_variant == "gemma_300m_lora"
     assert "lora" in repr(train_config.freeze_filter)
     assert train_config.ema_decay is None
-    assert train_config.data.repo_id == "local/arx_block_stack_bimanual_bad"
+    assert train_config.data.repo_id == "local/arx_block_stack_bimanual_new"
     assert train_config.data.assets.assets_dir == "gs://openpi-assets/checkpoints/pi05_base/assets"
     assert train_config.data.assets.asset_id == "arx"
     assert train_config.data.default_prompt == "place the red block on the blue block"
