@@ -54,6 +54,8 @@ The printed model config should include `gemma_2b_lora` and `gemma_300m_lora`.
 
 ## 4. Convert Dataset
 
+See `docs/arx_pi05_dataset_registry.md` for the current dataset repo ids, config names, and prompts.
+
 Set these paths to the real remote dataset locations:
 
 ```bash

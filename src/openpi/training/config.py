@@ -965,6 +965,34 @@ _CONFIGS = [
         wandb_enabled=False,
     ),
     TrainConfig(
+        name="pi05_arx_lora_watermelon_basket_debug",
+        model=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+        ),
+        data=LeRobotArxDataConfig(
+            repo_id="local/arx_watermelon_basket_bimanual",
+            assets=AssetsConfig(
+                assets_dir="gs://openpi-assets/checkpoints/pi05_base/assets",
+                asset_id="arx",
+            ),
+            default_prompt="scoop up the watermelon on the right and place it in the basket on the left",
+        ),
+        weight_loader=weight_loaders.CheckpointWeightLoader("gs://openpi-assets/checkpoints/pi05_base/params"),
+        freeze_filter=pi0_config.Pi0Config(
+            pi05=True,
+            paligemma_variant="gemma_2b_lora",
+            action_expert_variant="gemma_300m_lora",
+        ).get_freeze_filter(),
+        ema_decay=None,
+        batch_size=8,
+        num_train_steps=20_000,
+        save_interval=5_000,
+        keep_period=5_000,
+        wandb_enabled=False,
+    ),
+    TrainConfig(
         name="pi05_arx_lora_debug_fresh_stats",
         model=pi0_config.Pi0Config(
             pi05=True,

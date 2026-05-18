@@ -12,9 +12,11 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
 - Fresh norm-stats comparison config: `pi05_arx_debug_fresh_stats`
 - Low-memory LoRA training config: `pi05_arx_lora_debug`
 - Low-memory LoRA bad-data comparison config: `pi05_arx_lora_bad_debug`
+- Low-memory LoRA watermelon/basket task config: `pi05_arx_lora_watermelon_basket_debug`
 - Low-memory LoRA fresh-stats config: `pi05_arx_lora_debug_fresh_stats`
 - Dataset repo id expected by the config: `local/arx_block_stack_bimanual`
 - Bad-data comparison dataset repo id: `local/arx_block_stack_bimanual_bad`
+- Watermelon/basket dataset repo id: `local/arx_watermelon_basket_bimanual`
 - ARX debug configs save checkpoints every 5k steps to reduce disk usage.
 - Task prompt: `place the red block on the blue block`
 
@@ -50,9 +52,10 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
   - Does not apply ALOHA/Trossen joint flips or gripper transforms.
 - `src/openpi/training/config.py`
   - Adds `LeRobotArxDataConfig`.
-  - Adds `pi05_arx_debug`, `pi05_arx_lora_debug`, and `pi05_arx_lora_bad_debug`.
+  - Adds `pi05_arx_debug`, `pi05_arx_lora_debug`, `pi05_arx_lora_bad_debug`, and `pi05_arx_lora_watermelon_basket_debug`.
   - Use `pi05_arx_lora_debug` as the default training path on 2x RTX 4090.
   - Use `pi05_arx_lora_bad_debug` only for the lower-quality dataset comparison run.
+  - Use `pi05_arx_lora_watermelon_basket_debug` for the watermelon-to-basket task.
   - Full fine-tuning can OOM before the first step.
 - `scripts/make_arx_bimanual_lerobot.py`
   - Copies a LeRobot v3 dataset.
@@ -73,6 +76,8 @@ This repository is being adapted to fine-tune pi0.5 for an ARX-5 bi-manual block
 - `docs/arx_pi05_deployment.md`
   - Describes the first remote policy-server deployment path for ARX-5.
   - Covers 4090 server startup, controller-PC client inputs, action mapping, and safety checks.
+- `docs/arx_pi05_dataset_registry.md`
+  - Tracks ARX dataset repo ids, config names, prompts, conversion paths, and training commands.
 - Tests:
   - `src/openpi/policies/arx_policy_test.py`
   - `src/openpi/training/arx_config_test.py`

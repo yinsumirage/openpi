@@ -93,6 +93,25 @@ def test_pi05_arx_lora_bad_debug_config_targets_bad_quality_dataset():
     assert train_config.wandb_enabled is False
 
 
+def test_pi05_arx_lora_watermelon_basket_debug_config_targets_new_task_dataset():
+    train_config = _config.get_config("pi05_arx_lora_watermelon_basket_debug")
+
+    assert train_config.model.pi05 is True
+    assert train_config.model.paligemma_variant == "gemma_2b_lora"
+    assert train_config.model.action_expert_variant == "gemma_300m_lora"
+    assert "lora" in repr(train_config.freeze_filter)
+    assert train_config.ema_decay is None
+    assert train_config.data.repo_id == "local/arx_watermelon_basket_bimanual"
+    assert train_config.data.assets.assets_dir == "gs://openpi-assets/checkpoints/pi05_base/assets"
+    assert train_config.data.assets.asset_id == "arx"
+    assert train_config.data.default_prompt == "scoop up the watermelon on the right and place it in the basket on the left"
+    assert train_config.batch_size == 8
+    assert train_config.num_train_steps == 20_000
+    assert train_config.save_interval == 5_000
+    assert train_config.keep_period == 5_000
+    assert train_config.wandb_enabled is False
+
+
 def test_pi05_arx_lora_debug_fresh_stats_config_is_registered_for_dataset_norm_stats():
     train_config = _config.get_config("pi05_arx_lora_debug_fresh_stats")
 
